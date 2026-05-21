@@ -1,32 +1,42 @@
-name: Deploy
-on: [push] # 코드 수정 후 푸시하면 자동으로 시작됨
+name: Multi-Registry CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      # 1. Docker Hub로 보내기
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # 1. Docker Hub 로그인 및 푸시
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Push to Docker Hub
         uses: docker/build-push-action@v4
         with:
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-web:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
 
-      # 2. Azure ACR로 보내기
+      # 2. Azure ACR 로그인 및 푸시
+      - name: Login to ACR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
       - name: Push to ACR
         uses: docker/build-push-action@v4
         with:
           push: true
-          tags: ${{ secrets.ACR_LOGIN_SERVER }}/my-web:latest
-
-      # 3. Azure Container Apps에 자동 배포 명령
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      
-      - name: Update Container App
-        run: |
-          az containerapp update -n [내앱이름] -g [리소스그룹명] --image ${{ secrets.ACR_LOGIN_SERVER }}/my-web:latest
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/my-app:latest
